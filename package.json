@@ -1,0 +1,23 @@
+{
+  "name": "bulga-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Bulga, fetching FamPay transactions from Gmail",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "get-token": "node get-refresh-token.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^13.0.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "googleapis": "^173.0.0"
+  }
+}
