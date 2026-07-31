@@ -1,68 +1,61 @@
-// db.js — simple SQLite storage for Bulga's transactions and budget
-const Database = require('better-sqlite3');
+// db.js — simple JSON-file storage for Bulga's transactions and budget
+// Uses lowdb (pure JavaScript, no native compilation) instead of better-sqlite3
+// to avoid native-binary crashes on hosts like Railway.
+const { Low } = require('lowdb');
+const { JSONFile } = require('lowdb/node');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'bulga.db'));
+const file = path.join(__dirname, 'bulga-data.json');
+const adapter = new JSONFile(file);
+const defaultData = { transactions: {}, settings: {} };
+const db = new Low(adapter, defaultData);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS transactions (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT,
-    amount REAL NOT NULL,
-    type TEXT NOT NULL,
-    date TEXT NOT NULL,
-    time TEXT NOT NULL,
-    glyph TEXT,
-    tag TEXT
-  );
+// lowdb needs an async read before first use; we keep a ready promise
+// and every exported function awaits it first.
+const ready = db.read().then(() => {
+  db.data ||= defaultData;
+  db.data.transactions ||= {};
+  db.data.settings ||= {};
+});
 
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );
-`);
+// Insert/update transactions, but never overwrite a tag the user has already set.
+async function upsertTransactions(txns) {
+  await ready;
+  for (const t of txns) {
+    const existing = db.data.transactions[t.id];
+    db.data.transactions[t.id] = {
+      ...t,
+      tag: existing ? existing.tag : t.tag, // preserve user's manual tag if already set
+    };
+  }
+  await db.write();
+}
 
-// Insert new transactions, but never overwrite a tag the user has already set.
-function upsertTransactions(txns) {
-  const insert = db.prepare(`
-    INSERT INTO transactions (id, name, category, amount, type, date, time, glyph, tag)
-    VALUES (@id, @name, @category, @amount, @type, @date, @time, @glyph, @tag)
-    ON CONFLICT(id) DO UPDATE SET
-      name=excluded.name,
-      category=excluded.category,
-      amount=excluded.amount,
-      type=excluded.type,
-      date=excluded.date,
-      time=excluded.time,
-      glyph=excluded.glyph
-      -- NOTE: tag is deliberately NOT updated here, so a user's manual tag never gets clobbered
-  `);
-
-  const insertMany = db.transaction((rows) => {
-    for (const row of rows) insert.run(row);
+async function getAllTransactions() {
+  await ready;
+  return Object.values(db.data.transactions).sort((a, b) => {
+    const da = a.date + a.time, dbb = b.date + b.time;
+    return da < dbb ? 1 : da > dbb ? -1 : 0;
   });
-  insertMany(txns);
 }
 
-function getAllTransactions() {
-  return db.prepare(`SELECT * FROM transactions ORDER BY date DESC, time DESC`).all();
+async function setTag(id, tag) {
+  await ready;
+  if (db.data.transactions[id]) {
+    db.data.transactions[id].tag = tag;
+    await db.write();
+  }
 }
 
-function setTag(id, tag) {
-  db.prepare(`UPDATE transactions SET tag = ? WHERE id = ?`).run(tag, id);
+async function getBudget() {
+  await ready;
+  return db.data.settings.budget ?? null;
 }
 
-function getBudget() {
-  const row = db.prepare(`SELECT value FROM settings WHERE key = 'budget'`).get();
-  return row ? parseFloat(row.value) : null;
-}
-
-function setBudget(amount) {
-  db.prepare(`
-    INSERT INTO settings (key, value) VALUES ('budget', ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value
-  `).run(String(amount));
+async function setBudget(amount) {
+  await ready;
+  db.data.settings.budget = amount;
+  await db.write();
 }
 
 module.exports = { upsertTransactions, getAllTransactions, setTag, getBudget, setBudget };
