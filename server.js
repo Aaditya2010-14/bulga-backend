@@ -27,9 +27,9 @@ function requireApiKey(req, res, next) {
 app.use(requireApiKey);
 
 // GET /transactions — returns all stored transactions
-app.get('/transactions', async (req, res) => {
+app.get('/transactions', (req, res) => {
   try {
-    const txns = await db.getAllTransactions();
+    const txns = db.getAllTransactions();
     res.json({ transactions: txns });
   } catch (err) {
     console.error(err);
@@ -38,13 +38,13 @@ app.get('/transactions', async (req, res) => {
 });
 
 // POST /transactions/:id/tag — user tags a transaction { tag: "essential" | "miscellaneous" | "food" }
-app.post('/transactions/:id/tag', async (req, res) => {
+app.post('/transactions/:id/tag', (req, res) => {
   const { tag } = req.body;
   if (!['essential', 'miscellaneous', 'food', null].includes(tag)) {
     return res.status(400).json({ error: 'Invalid tag' });
   }
   try {
-    await db.setTag(req.params.id, tag);
+    db.setTag(req.params.id, tag);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -53,9 +53,9 @@ app.post('/transactions/:id/tag', async (req, res) => {
 });
 
 // GET /budget
-app.get('/budget', async (req, res) => {
+app.get('/budget', (req, res) => {
   try {
-    res.json({ budget: await db.getBudget() });
+    res.json({ budget: db.getBudget() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to read budget' });
@@ -63,13 +63,13 @@ app.get('/budget', async (req, res) => {
 });
 
 // POST /budget { amount: 5000 }
-app.post('/budget', async (req, res) => {
+app.post('/budget', (req, res) => {
   const { amount } = req.body;
   if (typeof amount !== 'number' || amount <= 0) {
     return res.status(400).json({ error: 'Invalid amount' });
   }
   try {
-    await db.setBudget(amount);
+    db.setBudget(amount);
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -82,7 +82,7 @@ app.post('/budget', async (req, res) => {
 app.post('/refresh', async (req, res) => {
   try {
     const txns = await fetchFamPayTransactions();
-    await db.upsertTransactions(txns);
+    db.upsertTransactions(txns);
     res.json({ ok: true, count: txns.length });
   } catch (err) {
     console.error('Refresh failed:', err);

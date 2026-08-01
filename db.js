@@ -1,61 +1,69 @@
 // db.js — simple JSON-file storage for Bulga's transactions and budget
-// Uses lowdb (pure JavaScript, no native compilation) instead of better-sqlite3
-// to avoid native-binary crashes on hosts like Railway.
-const { Low } = require('lowdb');
-const { JSONFile } = require('lowdb/node');
+// Uses plain Node fs (no database library at all) to avoid any
+// native-binary or ESM/CommonJS packaging issues on hosts like Railway.
+const fs = require('fs');
 const path = require('path');
 
-const file = path.join(__dirname, 'bulga-data.json');
-const adapter = new JSONFile(file);
-const defaultData = { transactions: {}, settings: {} };
-const db = new Low(adapter, defaultData);
+const FILE = path.join(__dirname, 'bulga-data.json');
 
-// lowdb needs an async read before first use; we keep a ready promise
-// and every exported function awaits it first.
-const ready = db.read().then(() => {
-  db.data ||= defaultData;
-  db.data.transactions ||= {};
-  db.data.settings ||= {};
-});
+function load() {
+  if (!fs.existsSync(FILE)) {
+    return { transactions: {}, settings: {} };
+  }
+  try {
+    const raw = fs.readFileSync(FILE, 'utf8');
+    const data = JSON.parse(raw);
+    data.transactions ||= {};
+    data.settings ||= {};
+    return data;
+  } catch (err) {
+    console.error('Failed to read/parse bulga-data.json, starting fresh:', err.message);
+    return { transactions: {}, settings: {} };
+  }
+}
+
+function save(data) {
+  fs.writeFileSync(FILE, JSON.stringify(data, null, 2), 'utf8');
+}
 
 // Insert/update transactions, but never overwrite a tag the user has already set.
-async function upsertTransactions(txns) {
-  await ready;
+function upsertTransactions(txns) {
+  const data = load();
   for (const t of txns) {
-    const existing = db.data.transactions[t.id];
-    db.data.transactions[t.id] = {
+    const existing = data.transactions[t.id];
+    data.transactions[t.id] = {
       ...t,
       tag: existing ? existing.tag : t.tag, // preserve user's manual tag if already set
     };
   }
-  await db.write();
+  save(data);
 }
 
-async function getAllTransactions() {
-  await ready;
-  return Object.values(db.data.transactions).sort((a, b) => {
+function getAllTransactions() {
+  const data = load();
+  return Object.values(data.transactions).sort((a, b) => {
     const da = a.date + a.time, dbb = b.date + b.time;
     return da < dbb ? 1 : da > dbb ? -1 : 0;
   });
 }
 
-async function setTag(id, tag) {
-  await ready;
-  if (db.data.transactions[id]) {
-    db.data.transactions[id].tag = tag;
-    await db.write();
+function setTag(id, tag) {
+  const data = load();
+  if (data.transactions[id]) {
+    data.transactions[id].tag = tag;
+    save(data);
   }
 }
 
-async function getBudget() {
-  await ready;
-  return db.data.settings.budget ?? null;
+function getBudget() {
+  const data = load();
+  return data.settings.budget ?? null;
 }
 
-async function setBudget(amount) {
-  await ready;
-  db.data.settings.budget = amount;
-  await db.write();
+function setBudget(amount) {
+  const data = load();
+  data.settings.budget = amount;
+  save(data);
 }
 
 module.exports = { upsertTransactions, getAllTransactions, setTag, getBudget, setBudget };
