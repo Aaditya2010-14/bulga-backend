@@ -11,6 +11,12 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
+// Health check — always public, no API key required, so you can quickly
+// confirm the server is alive from a browser.
+app.get('/', (req, res) => {
+  res.json({ status: 'Bulga backend is running' });
+});
+
 // Simple shared-secret check so random strangers on the internet can't hit your API.
 // Bulga will send this back on every request via the X-Bulga-Key header.
 function requireApiKey(req, res, next) {
@@ -88,10 +94,6 @@ app.post('/refresh', async (req, res) => {
     console.error('Refresh failed:', err);
     res.status(500).json({ error: 'Failed to refresh from Gmail', detail: err.message });
   }
-});
-
-app.get('/', (req, res) => {
-  res.json({ status: 'Bulga backend is running' });
 });
 
 app.listen(PORT, () => {
