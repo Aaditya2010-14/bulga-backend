@@ -1,6 +1,16 @@
 # Bulga Backend
 
-This is the server that fetches your FamPay transaction emails from Gmail
+Bulga is a personal finance tracker that automatically reads FamPay transaction
+notification emails from Gmail, parses them, and displays them in a clean,
+custom-built dashboard — no manual entry required. It features budget tracking,
+transaction tagging (Essential/Food/Miscellaneous), and category breakdowns,
+with a Node/Express backend that securely fetches and stores transaction data
+and a JavaScript frontend for the UI. The project is actively being extended
+into a standalone Android app with real-time push notifications powered by
+Google Cloud Pub/Sub and Firebase Cloud Messaging, along with OAuth-based
+Gmail login to support multiple users beyond a single hardcoded account.
+
+This repo is the server that fetches your FamPay transaction emails from Gmail
 and serves them to the Bulga app.
 
 ## What it does
